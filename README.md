@@ -44,6 +44,18 @@ Analitik raporlama performansını artırmak ve karmaşık JOIN yapılarını sa
 * **Idempotent ETL:** Verileri OLTP'den OLAP'a güvenli ve veri kirliliği yaratmadan aktaran tekrarlanabilir yükleme scriptleri yazıldı.
 * **SCD2 (Slowly Changing Dimensions):** Müşteri bilgilerindeki değişiklikleri, eski fatura raporlarını bozmadan tarihe gömen (`valid_from`, `valid_to`, `is_current`) zaman yolculuğu mimarisi kuruldu ve test edildi.
 * **A/B Benchmark Testi:** Yazılan karmaşık bir iş zekası sorgusu OLTP sistemde 4 adet `JOIN` ile ~300ms'de çalışırken, Star Schema üzerinde tek `JOIN` ile ~127ms'de çalıştırılarak **~2.3 kat performans artışı** ve düşük CPU tüketimi kanıtlandı.
+### Star Schema Grain (Tanecik) Tanımı
+* **`fct_orders` Tablosu:** Her bir satır, bir müşterinin verdiği **tek bir benzersiz siparişi (order)** temsil eder.
+* **`fct_order_items` Tablosu:** Her bir satır, verilen bir siparişin sepetindeki **tek bir ürün kalemini (line item)** temsil eder.
+
+### 10 İş Sorusu: OLTP vs Star Schema (DWH) Karşılaştırma Raporu
+DBeaver üzerinde 10 farklı analitik soru hem eski ilişkisel yapı (OLTP) hem de yeni yıldız şema (DWH) üzerinde test edilmiştir.
+
+| Analitik Soru Kategorisi | OLTP (Eski Sistem) | Star Schema (Yeni Sistem) | Okunabilirlik ve Süre Avantajı |
+| :--- | :--- | :--- | :--- |
+| **Ciro & Ürün Analizleri (Soru 1,3,5,8)** | 3-4 adet `JOIN` ve anlık matematik (`qty * price`) | Sadece 1 `JOIN` ve hesaplanmış `line_total` | Kod satırı %60 kısaldı, CPU hesaplama yükü ortadan kalktığı için tepki süresi hızlandı. |
+| **Zaman ve Tarih Analizleri (Soru 2,4,9)** | `EXTRACT()`, `TO_CHAR()` gibi maliyetli dönüşüm fonksiyonları | `dim_date` boyut tablosundan doğrudan okuma | Fonksiyonların yarattığı darboğaz (`Full Table Scan`) engellendi, tarih okumaları anlık hale geldi. |
+| **Müşteri Davranışları (Soru 6,7,10)** | `users` ve `orders` tablolarında `VARCHAR` e-posta aramaları | `dim_customer` üzerinden INT formatında `customer_sk` taraması | Surrogate Key kullanımı sayesinde `JOIN` maliyetleri düştü, sorgu yazımı basitleşti. |
 
 ### 5. Büyük Veri Analitiği: DuckDB vs Pandas (Ödev 3.5)
 Klasik veritabanlarından bağımsız olarak, 3 milyon satırlık (NYC Taxi) Parquet veri seti üzerinde sunucusuz (serverless) analitik performans kıyaslaması yapılmıştır.
