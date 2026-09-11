@@ -82,3 +82,17 @@ CREATE TABLE inventory_movements (
     reason VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 11. SCD2 Fiyat Tarihçesi Tablosunu Oluştur
+CREATE TABLE IF NOT EXISTS product_price_history (
+    id SERIAL PRIMARY KEY,
+    product_id INT,
+    price NUMERIC(10, 2),
+    valid_from TIMESTAMP,
+    valid_to TIMESTAMP
+);
+
+-- 12. Mevcut Ürünlerin Fiyatlarını Tabloya Aktar
+INSERT INTO product_price_history (product_id, price, valid_from, valid_to)
+SELECT id, price, '2024-01-01 00:00:00'::timestamp, NULL
+FROM products;

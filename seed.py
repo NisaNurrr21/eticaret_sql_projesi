@@ -15,6 +15,9 @@ conn = psycopg2.connect(
     dbname="eticaret", user="admin", password="secret", host="localhost", port="5432"
 )
 cur = conn.cursor()
+print("Eski veriler temizleniyor, sıfırdan başlanacak...")
+cur.execute("TRUNCATE TABLE inventory_movements, reviews, shipments, payments, order_items, orders, products, coupons, categories, users, product_price_history RESTART IDENTITY CASCADE;")
+conn.commit()
 
 print("Veri üretimi başlıyor, lütfen bekleyin...")
 
@@ -67,16 +70,17 @@ print("1,000 ürün eklendi.")
 populerlik_agirliklari = np.random.pareto(a=2, size=len(products_data))
 populerlik_agirliklari /= populerlik_agirliklari.sum()
 
-# Toplam 200,000 sipariş üreteceğiz (Hızlı test için sayıyı azalttık, istenirse 500k yapılabilir)
-toplam_siparis = 200000
+# Toplam 500,000 sipariş üreteceğiz
+toplam_siparis = 500000
+
 for i in range(toplam_siparis):
     user_id = random.choice(users_data)
     
-    # Mevsimsellik: Yaz aylarında sipariş yoğunluğunu artıracağız
-    created_at = fake.date_time_between(start_date='-1y', end_date='now')
-    if created_at.month in [6, 7, 8]:
-        # Yazın sipariş verme ihtimalini simüle etmek için bu tarihleri daha sık seç
-        pass 
+    # Mevsimsellik: Siparişlerin %40'ını kasıtlı olarak yaz aylarına (Haziran, Temmuz, Ağustos) yığıyoruz
+    if random.random() < 0.40:
+        created_at = fake.date_time_between_dates(datetime_start=datetime.now().replace(month=6, day=1), datetime_end=datetime.now().replace(month=8, day=31))
+    else:
+        created_at = fake.date_time_between(start_date='-1y', end_date='now')
         
     # Sipariş statüsü: %2 İade (returned), %5 Kasıtlı Anomali (pending ama ödenmiş vs.), kalanı completed
     rand_status = random.random()
@@ -123,12 +127,36 @@ for i in range(toplam_siparis):
             "INSERT INTO payments (order_id, amount, status) VALUES (%s, %s, %s)",
             (order_id, order_total, 'success' if status == 'completed' else 'refunded')
         )
-        
+        # Ödeme kısmının bittiği yerin altına ekle:
+        if status == 'completed':
+            # 1. Kargo (Shipments) verisi oluştur
+            cur.execute(
+                "INSERT INTO shipments (order_id, tracking_number, status) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                (order_id, fake.unique.bothify(text='TR-#########'), random.choice(['shipped', 'delivered', 'delivered']))
+            )
+            
+            # 2. Yorum (Reviews) verisi oluştur (%10 ihtimalle müşteri ürünlere yorum yapsın)
+            if random.random() < 0.10:
+                for product_id in secilen_urunler:
+                    cur.execute(
+                        "INSERT INTO reviews (user_id, product_id, rating, comment) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                        (user_id, int(product_id), random.randint(1, 5), fake.sentence(nb_words=5))
+                    )
     if i % 10000 == 0:
         conn.commit()
         print(f"{i} sipariş işlendi...")
 
 conn.commit()
+# --- 6. Envanter Hareketleri (Inventory Movements) ---
+print("Envanter hareketleri oluşturuluyor...")
+for p_id in products_data:
+    # Her ürün için rastgele bir başlangıç stoğu (Initial Stock) hareketi ekle
+    cur.execute(
+        "INSERT INTO inventory_movements (product_id, quantity_changed, reason) VALUES (%s, %s, %s)",
+        (p_id, random.randint(100, 1000), 'Initial Stock Load')
+    )
+conn.commit()
+print("Eksik tablolar başarıyla dolduruldu!")
 cur.close()
 conn.close()
 print("Veritabanı besleme (seeding) işlemi tamamlandı!")
