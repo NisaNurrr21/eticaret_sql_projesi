@@ -31,3 +31,16 @@ Projedeki veritabanını sıfırdan kurmak ve verilerle doldurmak için terminal
 # Tabloları oluşturur ve 500k sentetik veriyi basar
 python seed.py
 ```
+
+### 3. Veritabanı Performans Optimizasyonu (Ödev 3.3)
+Veritabanı üzerindeki yavaş (costly) sorgular tespit edilmiş ve `EXPLAIN ANALYZE` okumalarıyla darboğazlar giderilmiştir. Toplamda 5 farklı optimizasyon senaryosu laboratuvar ortamında test edilmiştir:
+* **Index & Bitmap Scan:** B-Tree ve kompozit (composite) indeksler ile `Parallel Seq Scan` taramaları `Bitmap Index Scan` seviyesine çekilerek sorgularda 400 kata varan hızlanmalar sağlandı.
+* **Anti-Pattern Analizi:** İndekslerin neden çalışmadığına dair (fonksiyon kullanımı, düşük seçicilik) derinlemesine analizler yapıldı.
+* *Tüm performans karşılaştırmaları ve kanıtları `performans_lab.md` dosyasında raporlanmıştır.*
+
+### 4. Veri Ambarı ve Star Schema Mimarisi (Ödev 3.4)
+Analitik raporlama performansını artırmak ve karmaşık JOIN yapılarını sadeleştirmek için OLTP veritabanından OLAP (Veri Ambarı) mimarisine geçiş yapılmıştır.
+* **Şema Tasarımı:** Merkezde `fct_orders`, `fct_order_items` (Gerçek) ve etrafında `dim_customer`, `dim_product`, `dim_date` (Boyut) tabloları ile Star Schema kurgulandı.
+* **Idempotent ETL:** Verileri OLTP'den OLAP'a güvenli ve veri kirliliği yaratmadan aktaran tekrarlanabilir yükleme scriptleri yazıldı.
+* **SCD2 (Slowly Changing Dimensions):** Müşteri bilgilerindeki değişiklikleri, eski fatura raporlarını bozmadan tarihe gömen (`valid_from`, `valid_to`, `is_current`) zaman yolculuğu mimarisi kuruldu ve test edildi.
+* **A/B Benchmark Testi:** Yazılan karmaşık bir iş zekası sorgusu OLTP sistemde 4 adet `JOIN` ile ~300ms'de çalışırken, Star Schema üzerinde tek `JOIN` ile ~127ms'de çalıştırılarak **~2.3 kat performans artışı** ve düşük CPU tüketimi kanıtlandı.
