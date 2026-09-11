@@ -303,3 +303,17 @@ Veritabanı burada klasik bir Index Scan yerine Bitmap Index Scan yapmayı terci
 | ⚡ **Hızlanma Oranı** | - | **~3.3 Kat Daha Hızlı** |
 
 ---
+
+**A/B Testi Sonuçları: OLTP vs Star Schema (Data Warehouse)**
+
+| Karşılaştırma Metriği | OLTP Şeması (Eski) | Star Schema (Yeni DWH) | Sağlanan Avantaj |
+| :--- | :--- | :--- | :--- |
+| **Çalışma Süresi** | 299.927 ms | 127.321 ms | **~2.3 Kat Daha Hızlı** |
+| **Sorgu Karmaşıklığı** | 4 Tablo (3 adet `JOIN`) | 2 Tablo (1 adet `JOIN`) | Çok daha temiz/okunabilir SQL |
+| **Matematiksel Yük** | Çalışma anında (`qty * price`) | Önceden hesaplanmış (`line_total`) | Düşük CPU kullanımı |
+
+**Performans Artışının Teknik Nedenleri:**
+
+* **JOIN Sayısının Düşmesi:** OLTP veritabanında "Kategori" bilgisine ulaşmak için `orders` -> `order_items` -> `products` -> `categories` şeklinde 4 tablonun birleştirilmesi (ardışık Hash Join işlemleri) gerekmiştir. Star Schema'da ise kategori bilgisi `dim_product` boyut tablosuna gömüldüğü (denormalize edildiği) için tek bir JOIN ile aynı veriye ulaşılmıştır.
+* **Hesaplanmış Metrikler (Pre-computation):** OLTP sorgusunda her bir ürün kalemi için miktar ve fiyat anlık olarak çarpılırken (`quantity * unit_price`); ETL sürecimizde bu değer `line_total` olarak Fact tablosuna peşinen yazıldığı için, veritabanı okuma anında ekstra işlemci gücü harcamaktan kurtulmuştur.
+* **Genişleyebilirlik:** Tablodaki veri miktarı milyonlarca satıra çıktığında, OLTP'deki çoklu JOIN'lerin maliyeti logaritmik olarak artıp sistemi kilitleyecekken; Star Schema mimarisi (Fact ve Dimension mantığı) bu yükü çok daha yatay ve stabil bir şekilde karşılayacaktır.
