@@ -317,3 +317,17 @@ Veritabanı burada klasik bir Index Scan yerine Bitmap Index Scan yapmayı terci
 * **JOIN Sayısının Düşmesi:** OLTP veritabanında "Kategori" bilgisine ulaşmak için `orders` -> `order_items` -> `products` -> `categories` şeklinde 4 tablonun birleştirilmesi (ardışık Hash Join işlemleri) gerekmiştir. Star Schema'da ise kategori bilgisi `dim_product` boyut tablosuna gömüldüğü (denormalize edildiği) için tek bir JOIN ile aynı veriye ulaşılmıştır.
 * **Hesaplanmış Metrikler (Pre-computation):** OLTP sorgusunda her bir ürün kalemi için miktar ve fiyat anlık olarak çarpılırken (`quantity * unit_price`); ETL sürecimizde bu değer `line_total` olarak Fact tablosuna peşinen yazıldığı için, veritabanı okuma anında ekstra işlemci gücü harcamaktan kurtulmuştur.
 * **Genişleyebilirlik:** Tablodaki veri miktarı milyonlarca satıra çıktığında, OLTP'deki çoklu JOIN'lerin maliyeti logaritmik olarak artıp sistemi kilitleyecekken; Star Schema mimarisi (Fact ve Dimension mantığı) bu yükü çok daha yatay ve stabil bir şekilde karşılayacaktır.
+
+---
+
+**Büyük Veri Analitiği (3 Milyon Satır Parquet): DuckDB vs Pandas**
+
+| Kriter | DuckDB (Sunucusuz SQL) | Pandas (DataFrame) | Sağlanan Avantaj |
+| :--- | :--- | :--- | :--- |
+| **Sorgu Süresi (10 İşlem)** | 0.263 saniye | 3.259 saniye | **~12.4 Kat Daha Hızlı** |
+| **Bellek (RAM) Tüketimi** | 10.81 MB | 1038.28 MB (1 GB) | **~96 Kat Daha Az RAM** |
+
+**Performans Farkının Teknik Nedenleri:**
+
+* **Tembel Çalışma (Lazy Evaluation) & Disk Okuma:** Pandas, en ufak bir analiz yapabilmek için dahi Parquet dosyasının *tamamını* dekomprese edip RAM'e yüklemek zorundadır (bu yüzden sistemden 1 GB RAM çeker). DuckDB ise dosyayı RAM'e almaz; doğrudan disk üzerindeki sıkıştırılmış Parquet dosyasına SQL atar ve sadece sonucu (birkaç satırı) belleğe getirerek 10 MB ile işi bitirir.
+* **Kolon Bazlı ve Vektörel İşleme:** DuckDB, analitik sorgular (OLAP) için özel tasarlanmış, C++ ile yazılmış vektörel bir motora sahiptir. İstenen `GROUP BY` veya `SUM` işlemlerini donanıma en yakın seviyede, CPU önbelleklerini (cache) maksimum kullanarak milisaniyeler içinde tamamlar. Pandas ise tek thread (iş parçacığı) üzerinde çalışan çok daha hantal bir yapıya sahiptir.

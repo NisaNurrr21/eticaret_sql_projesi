@@ -44,3 +44,9 @@ Analitik raporlama performansını artırmak ve karmaşık JOIN yapılarını sa
 * **Idempotent ETL:** Verileri OLTP'den OLAP'a güvenli ve veri kirliliği yaratmadan aktaran tekrarlanabilir yükleme scriptleri yazıldı.
 * **SCD2 (Slowly Changing Dimensions):** Müşteri bilgilerindeki değişiklikleri, eski fatura raporlarını bozmadan tarihe gömen (`valid_from`, `valid_to`, `is_current`) zaman yolculuğu mimarisi kuruldu ve test edildi.
 * **A/B Benchmark Testi:** Yazılan karmaşık bir iş zekası sorgusu OLTP sistemde 4 adet `JOIN` ile ~300ms'de çalışırken, Star Schema üzerinde tek `JOIN` ile ~127ms'de çalıştırılarak **~2.3 kat performans artışı** ve düşük CPU tüketimi kanıtlandı.
+
+### 5. Büyük Veri Analitiği: DuckDB vs Pandas (Ödev 3.5)
+Klasik veritabanlarından bağımsız olarak, 3 milyon satırlık (NYC Taxi) Parquet veri seti üzerinde sunucusuz (serverless) analitik performans kıyaslaması yapılmıştır.
+* **Hız Avantajı:** C++ tabanlı vektörel sorgu motoru kullanan DuckDB, 10 farklı iş zekası sorgusunu Pandas'a kıyasla **~12.4 kat daha hızlı** (0.26 sn vs 3.25 sn) tamamlamıştır.
+* **RAM Optimizasyonu:** Pandas tüm dosyayı RAM'e alarak **~1 GB** bellek tüketirken; DuckDB veriyi RAM'e yüklemeden doğrudan diskten okuyarak (lazy evaluation) süreci yalnızca **~10 MB** bellek ile bitirmiştir.
+* *Detaylı bellek ve CPU karşılaştırma raporu `performans_lab.md` dosyasında yer almaktadır.*
